@@ -4,27 +4,35 @@ import { useState, useEffect, useCallback } from "react";
 
 export default function Payment() {
   const [orderIdFromUrl, setOrderIdFromUrl] = useState(null);
-  const [status, setStatus] = useState("pending"); // pending | paid | failed
+  const [status, setStatus] = useState("pending");
   const [loading, setLoading] = useState(false);
 
+  
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setOrderIdFromUrl(params.get("order_id"));
+    const orderId = params.get("order_id");
+
+    if (orderId) {
+      setOrderIdFromUrl(orderId);
+    }
   }, []);
 
   const handlePay = async () => {
     setLoading(true);
+
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ amount: 1000 }),
       });
 
       const data = await res.json();
 
       if (data.url) {
-        window.location.href = data.url; // SafePay checkout page pe redirect
+        window.location.href = data.url;
       }
     } catch (err) {
       console.error("Checkout error:", err);
@@ -32,30 +40,43 @@ export default function Payment() {
     }
   };
 
+  
   const checkStatus = useCallback(async (orderId) => {
     try {
       const res = await fetch(`/api/order-status/${orderId}`);
       const data = await res.json();
 
-      if (data.status) setStatus(data.status);
+      if (data.status) {
+        setStatus(data.status);
+      }
 
       return data.status;
     } catch (err) {
       console.error("Status check error:", err);
+      return null;
     }
   }, []);
 
-  // Redirect ke baad wapas aane par polling shuru
+  
   useEffect(() => {
     if (!orderIdFromUrl) return;
 
-    const interval = setInterval(async () => {
-      const current = await checkStatus(orderIdFromUrl);
+    let interval;
 
-      if (current === "paid" || current === "failed") {
+    const checkPayment = async () => {
+      const currentStatus = await checkStatus(orderIdFromUrl);
+
+      
+      if (currentStatus === "paid" || currentStatus === "failed") {
         clearInterval(interval);
       }
-    }, 2000);
+    };
+
+  
+    checkPayment();
+
+  
+    interval = setInterval(checkPayment, 2000);
 
     return () => clearInterval(interval);
   }, [orderIdFromUrl, checkStatus]);
@@ -63,6 +84,7 @@ export default function Payment() {
   return (
     <div className="min-h-screen w-full bg-[#F6F3EC] flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-[#FFFFFF] rounded-[28px] shadow-[0_20px_60px_-15px_rgba(30,58,45,0.25)] border border-[#E4DDCB] overflow-hidden">
+
         <div className="bg-[#1E3A2D] px-8 pt-10 pb-8 relative">
           <p className="text-[#C9A24B] text-sm tracking-wide font-medium mb-1">
             Checkout
@@ -81,8 +103,11 @@ export default function Payment() {
         </div>
 
         <div className="px-8 py-8">
+
           <div className="flex items-end justify-between border-b border-[#E4DDCB] pb-6 mb-6">
-            <span className="text-[#6B6355] text-sm">Amount due</span>
+            <span className="text-[#6B6355] text-sm">
+              Amount due
+            </span>
 
             <span
               className="text-[#1E3A2D] text-4xl"
@@ -123,6 +148,7 @@ export default function Payment() {
                 : "Payment failed"}
             </span>
           </div>
+
         </div>
       </div>
     </div>
