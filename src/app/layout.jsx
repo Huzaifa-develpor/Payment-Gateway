@@ -1,7 +1,3 @@
-// app/layout.jsx
-// Root layout — wraps every page in the app. Loads global Tailwind styles
-// and the two fonts used by the payment designs (Fraunces for Design 1,
-// system sans for Design 2's clean look).
 
 import "./globals.css";
 
