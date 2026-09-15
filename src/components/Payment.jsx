@@ -1,18 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
 
-function PaymentContent() {
-  const searchParams = useSearchParams();
-  const orderIdFromUrl = searchParams.get("order_id");
-
-  const [status, setStatus] = useState("pending");
+export default function Payment() {
+  const [orderIdFromUrl, setOrderIdFromUrl] = useState(null);
+  const [status, setStatus] = useState("pending"); // pending | paid | failed
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setOrderIdFromUrl(params.get("order_id"));
+  }, []);
 
   const handlePay = async () => {
     setLoading(true);
-
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
@@ -23,7 +24,7 @@ function PaymentContent() {
       const data = await res.json();
 
       if (data.url) {
-        window.location.href = data.url;
+        window.location.href = data.url; // SafePay checkout page pe redirect
       }
     } catch (err) {
       console.error("Checkout error:", err);
@@ -44,6 +45,7 @@ function PaymentContent() {
     }
   }, []);
 
+  // Redirect ke baad wapas aane par polling shuru
   useEffect(() => {
     if (!orderIdFromUrl) return;
 
@@ -124,13 +126,5 @@ function PaymentContent() {
         </div>
       </div>
     </div>
-  );
-}
-
-export default function Payment() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <PaymentContent />
-    </Suspense>
   );
 }
