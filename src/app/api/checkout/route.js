@@ -1,4 +1,3 @@
-// app/api/checkout/route.js
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
 import { safepay } from "@/lib/safepay";
@@ -15,16 +14,23 @@ export async function POST(req) {
     currency: "PKR",
   });
 
- const checkoutUrl = safepay.checkout.create({
-  token,
-  orderId,
-  cancelUrl: `http://localhost:3000/payment?cancelled=true`,
-  redirectUrl: `http://localhost:3000/payment`,   
-  source: "custom",
-  webhooks: true,
-});
+  const checkoutUrl = safepay.checkout.create({
+    token,
+    orderId,
+    cancelUrl:
+      "https://payment-gateway-haip5nx45-muhammad-huzaifa-s-devprojects1.vercel.app/payment?cancelled=true",
+    redirectUrl:
+      "https://payment-gateway-haip5nx45-muhammad-huzaifa-s-devprojects1.vercel.app/payment",
+    source: "custom",
+    webhooks: true,
+  });
 
-  await Payment.create({ orderId, token, amount, status: "pending" });
+  await Payment.create({
+    orderId,
+    token,
+    amount,
+    status: "pending",
+  });
 
   return NextResponse.json({ url: checkoutUrl, orderId });
 }
