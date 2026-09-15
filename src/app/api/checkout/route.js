@@ -24,7 +24,7 @@ export async function POST(req) {
     source: "custom",
     webhooks: true,
   });
-
+  console.log(" SAFE PAY CHECKOUT URL:", checkoutUrl);
   await Payment.create({
     orderId,
     token,
