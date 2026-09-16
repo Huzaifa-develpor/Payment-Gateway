@@ -9,26 +9,29 @@ export async function POST(req) {
     const rawBody = await req.text();
     const event = JSON.parse(rawBody);
 
-    // ⚠️ TEMP: signature verification skip kiya hai — sandbox/learning ke liye theek hai,
-    // production mein jaane se pehle Safepay se exact HMAC algorithm confirm karke wapas add karna hai
-
     const data = event?.data;
-    console.log("[Webhook] Event type:", data?.type);
-
+    const eventType = data?.type?.toLowerCase(); 
+    const state = data?.notification?.state;
     const orderId = data?.notification?.metadata?.order_id;
-    const state = data?.notification?.state; // "PAID", "FAILED", etc.
+
+    console.log("[Webhook] RAW EVENT:", JSON.stringify(event, null, 2));
+    console.log("[Webhook] Event type:", eventType, "| State:", state, "| OrderId:", orderId);
 
     if (!orderId) {
       return NextResponse.json({ error: "Missing orderId" }, { status: 400 });
     }
 
-    if (data?.type === "payment:created" && state === "PAID") {
-       await Payment.findOneAndUpdate({ orderId }, { status: "paid" }, { new: true });
- 
-    } else if (state === "FAILED") {
-       await Payment.findOneAndUpdate({ orderId }, { status: "failed" }, { new: true });
+    const isPaid = eventType === "payment.succeeded" || state === "PAID";
+    const isFailed = eventType === "payment.failed" || state === "FAILED";
+
+    if (isPaid) {
+      await Payment.findOneAndUpdate({ orderId }, { status: "paid" }, { new: true });
+      console.log("[Webhook] Marked as PAID:", orderId);
+    } else if (isFailed) {
+      await Payment.findOneAndUpdate({ orderId }, { status: "failed" }, { new: true });
+      console.log("[Webhook] Marked as FAILED:", orderId);
     } else {
-      console.log("[Webhook] Unhandled state:", state);
+      console.log("[Webhook] Unhandled event, no DB update. Full type was:", eventType);
     }
 
     return NextResponse.json({ received: true });
