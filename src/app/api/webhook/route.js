@@ -1,16 +1,54 @@
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
-import { safepay } from "@/lib/safepay";
 import Payment from "@/models/paymentModel";
+import crypto from "crypto";
 
 export async function POST(req) {
   try {
     await connectToDB();
 
-    // Verify that the webhook was sent by SafePay.
-    const isValid = await safepay.verify.webhook(req);
+    // Read the raw request body.
+    const rawBody = await req.text();
 
-    if (!isValid) {
+    // Read the SafePay signature from the request header.
+    const receivedSignature = req.headers.get("x-sfpy-signature");
+
+    if (!receivedSignature) {
+      console.log("[Webhook] Missing SafePay signature");
+
+      return NextResponse.json(
+        { error: "Missing webhook signature" },
+        { status: 401 }
+      );
+    }
+
+    // Get the webhook secret from environment variables.
+    const webhookSecret = process.env.SAFEPAY_WEBHOOK_SECRET;
+
+    if (!webhookSecret) {
+      console.error("[Webhook] SAFEPAY_WEBHOOK_SECRET is missing");
+
+      return NextResponse.json(
+        { error: "Webhook secret is not configured" },
+        { status: 500 }
+      );
+    }
+
+    // Generate the expected HMAC-SHA512 signature from the raw body.
+    const expectedSignature = crypto
+      .createHmac("sha512", webhookSecret)
+      .update(rawBody)
+      .digest("hex");
+
+    // Compare the received signature with the calculated signature.
+    const receivedBuffer = Buffer.from(receivedSignature, "hex");
+    const expectedBuffer = Buffer.from(expectedSignature, "hex");
+
+    const signatureValid =
+      receivedBuffer.length === expectedBuffer.length &&
+      crypto.timingSafeEqual(receivedBuffer, expectedBuffer);
+
+    if (!signatureValid) {
       console.log("[Webhook] Invalid webhook signature");
 
       return NextResponse.json(
@@ -20,9 +58,6 @@ export async function POST(req) {
     }
 
     console.log("[Webhook] Signature verified successfully");
-
-    // Read the raw request body after signature verification.
-    const rawBody = await req.text();
 
     // Parse the verified webhook body.
     const event = JSON.parse(rawBody);
