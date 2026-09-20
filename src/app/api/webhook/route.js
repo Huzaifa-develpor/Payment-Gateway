@@ -23,6 +23,8 @@ export async function POST(req) {
       );
     }
 
+    
+
     // Get the webhook secret from environment variables.
     const webhookSecret = process.env.SAFEPAY_WEBHOOK_SECRET;
 
@@ -146,6 +148,38 @@ export async function POST(req) {
         state
       );
     }
+
+    console.log("[Webhook] Signature length:", receivedSignature.length);
+
+console.log(
+  "[Webhook] Secret exists:",
+  !!webhookSecret
+);
+
+console.log(
+  "[Webhook] Secret length:",
+  webhookSecret?.length
+);
+
+console.log(
+  "[Webhook] Secret starts with:",
+  webhookSecret?.slice(0, 4)
+);
+
+console.log(
+  "[Webhook] Raw body length:",
+  rawBody.length
+);
+
+console.log(
+  "[Webhook] Expected signature:",
+  expectedSignature
+);
+
+console.log(
+  "[Webhook] Received signature:",
+  receivedSignature
+);
 
     return NextResponse.json({ received: true });
   } catch (error) {
