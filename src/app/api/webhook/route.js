@@ -57,14 +57,7 @@ export async function POST(req) {
       .update(signedPayload)
       .digest("hex");
 
-    console.log("[Webhook] Signature length:", receivedSignature.length);
-    console.log("[Webhook] Secret exists:", !!webhookSecret);
-    console.log("[Webhook] Secret length:", webhookSecret.length);
-    console.log("[Webhook] Raw body length:", rawBody.length);
-    console.log("[Webhook] Expected signature:", expectedSignature);
-    console.log("[Webhook] Received signature:", receivedSignature);
-
-    // Convert signatures to buffers for timing-safe comparison.
+    // Compare the signatures securely.
     const receivedBuffer = Buffer.from(receivedSignature, "hex");
     const expectedBuffer = Buffer.from(expectedSignature, "hex");
 
@@ -81,25 +74,12 @@ export async function POST(req) {
       );
     }
 
-    console.log("[Webhook] Signature verified successfully");
-
     // Normalize event type for consistent comparison.
     const eventType = (data?.type || "").toLowerCase().replace(/:/g, ".");
 
     const state = (data?.notification?.state || "").toUpperCase();
 
     const orderId = data?.notification?.metadata?.order_id;
-
-    console.log("[Webhook] RAW EVENT:", JSON.stringify(event, null, 2));
-
-    console.log(
-      "[Webhook] Normalized type:",
-      eventType,
-      "| State:",
-      state,
-      "| OrderId:",
-      orderId
-    );
 
     if (!orderId) {
       console.log("[Webhook] No orderId found, skipping");
@@ -129,7 +109,7 @@ export async function POST(req) {
       const updated = await Payment.findOneAndUpdate(
         { orderId },
         { status: "paid" },
-        { new: true }
+        { returnDocument: "after" }
       );
 
       console.log(
@@ -142,7 +122,7 @@ export async function POST(req) {
       const updated = await Payment.findOneAndUpdate(
         { orderId },
         { status: "failed" },
-        { new: true }
+        { returnDocument: "after" }
       );
 
       console.log(
