@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
-import { safepay } from "@/lib/safepay";
 import Payment from "@/models/paymentModel";
 import crypto from "crypto";
 
@@ -8,7 +7,7 @@ export async function POST(req) {
   try {
     await connectToDB();
 
-    // Read the raw request body exactly as received.
+    // Read the raw request body.
     const rawBody = await req.text();
 
     // Read the signature sent by SafePay.
@@ -23,8 +22,6 @@ export async function POST(req) {
       );
     }
 
-    
-
     // Get the webhook secret from environment variables.
     const webhookSecret = process.env.SAFEPAY_WEBHOOK_SECRET;
 
@@ -37,62 +34,43 @@ export async function POST(req) {
       );
     }
 
-    // Generate the signature using SafePay's legacy webhook format.
+    // Parse the webhook body.
+    const event = JSON.parse(rawBody);
+
+    const data = event?.data;
+
+    if (!data) {
+      console.log("[Webhook] Missing data object");
+
+      return NextResponse.json(
+        { error: "Invalid webhook payload" },
+        { status: 400 }
+      );
+    }
+
+    // SafePay legacy webhooks sign the data object, not the full request body.
+    const signedPayload = JSON.stringify(data);
+
+    // Generate the expected SafePay webhook signature.
     const expectedSignature = crypto
       .createHmac("sha512", webhookSecret)
-      .update(rawBody)
+      .update(signedPayload)
       .digest("hex");
 
-    // Compare the SafePay signature with the calculated signature.
+    console.log("[Webhook] Signature length:", receivedSignature.length);
+    console.log("[Webhook] Secret exists:", !!webhookSecret);
+    console.log("[Webhook] Secret length:", webhookSecret.length);
+    console.log("[Webhook] Raw body length:", rawBody.length);
+    console.log("[Webhook] Expected signature:", expectedSignature);
+    console.log("[Webhook] Received signature:", receivedSignature);
+
+    // Convert signatures to buffers for timing-safe comparison.
     const receivedBuffer = Buffer.from(receivedSignature, "hex");
     const expectedBuffer = Buffer.from(expectedSignature, "hex");
 
     const signatureValid =
       receivedBuffer.length === expectedBuffer.length &&
       crypto.timingSafeEqual(receivedBuffer, expectedBuffer);
-
-    console.log("[Webhook] Signature length:", receivedSignature.length);
-
-console.log(
-  "[Webhook] Secret exists:",
-  !!webhookSecret
-);
-
-console.log(
-  "[Webhook] Secret length:",
-  webhookSecret.length
-);
-
-console.log(
-  "[Webhook] Secret starts with:",
-  webhookSecret.slice(0, 4)
-);
-
-console.log(
-  "[Webhook] Raw body length:",
-  rawBody.length
-);
-
-console.log(
-  "[Webhook] Expected signature:",
-  expectedSignature
-);
-
-console.log(
-  "[Webhook] Received signature:",
-  receivedSignature
-);
-
-if (!signatureValid) {
-  console.log("[Webhook] Invalid webhook signature");
-
-  return NextResponse.json(
-    { error: "Invalid webhook signature" },
-    { status: 401 }
-  );
-}
-
-console.log("[Webhook] Signature verified successfully");
 
     if (!signatureValid) {
       console.log("[Webhook] Invalid webhook signature");
@@ -104,11 +82,6 @@ console.log("[Webhook] Signature verified successfully");
     }
 
     console.log("[Webhook] Signature verified successfully");
-
-    // Parse the verified webhook body.
-    const event = JSON.parse(rawBody);
-
-    const data = event?.data;
 
     // Normalize event type for consistent comparison.
     const eventType = (data?.type || "").toLowerCase().replace(/:/g, ".");
@@ -191,8 +164,6 @@ console.log("[Webhook] Signature verified successfully");
         state
       );
     }
-
-    
 
     return NextResponse.json({ received: true });
   } catch (error) {
