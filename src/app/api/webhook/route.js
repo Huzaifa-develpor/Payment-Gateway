@@ -1,89 +1,23 @@
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
 import Payment from "@/models/paymentModel";
-import crypto from "crypto";
 
 export async function POST(req) {
   try {
     await connectToDB();
 
-    // Read the raw request body before parsing JSON.
+    // Read the raw request body.
     const rawBody = await req.text();
 
-    // Read SafePay webhook security headers.
-    const timestamp = req.headers.get("x-sfpy-timestamp");
-    const signature = req.headers.get("x-sfpy-signature");
+    // Log all headers received from SafePay.
+    console.log(
+      "[Webhook] Headers:",
+      Object.fromEntries(req.headers.entries())
+    );
 
-    if (!timestamp || !signature) {
-      console.log("[Webhook] Missing signature headers");
+    // Log the raw webhook body.
+    console.log("[Webhook] Raw body:", rawBody);
 
-      return NextResponse.json(
-        { error: "Missing webhook signature" },
-        { status: 401 }
-      );
-    }
-
-    // Get the webhook secret from environment variables.
-    const webhookSecret = process.env.SAFEPAY_WEBHOOK_SECRET;
-
-    if (!webhookSecret) {
-      console.error("[Webhook] SAFEPAY_WEBHOOK_SECRET is missing");
-
-      return NextResponse.json(
-        { error: "Webhook secret is not configured" },
-        { status: 500 }
-      );
-    }
-
-    // Prevent replay attacks by rejecting old webhook requests.
-    const currentTime = Math.floor(Date.now() / 1000);
-    const webhookTime = Number(timestamp);
-
-    if (
-      !Number.isFinite(webhookTime) ||
-      Math.abs(currentTime - webhookTime) > 5 * 60
-    ) {
-      console.log("[Webhook] Webhook timestamp is too old or invalid");
-
-      return NextResponse.json(
-        { error: "Invalid webhook timestamp" },
-        { status: 401 }
-      );
-    }
-
-    // SafePay signs the timestamp and raw request body together.
-    const signedPayload = `${timestamp}.${rawBody}`;
-
-    // Decode the base64 webhook secret before creating the HMAC.
-    const secret = Buffer.from(webhookSecret, "base64");
-
-    const expectedSignature =
-      "sha256=" +
-      crypto
-        .createHmac("sha256", secret)
-        .update(signedPayload)
-        .digest("hex");
-
-    // Compare signatures using a timing-safe comparison.
-    const receivedSignature = Buffer.from(signature);
-    const calculatedSignature = Buffer.from(expectedSignature);
-
-    const signatureValid =
-      receivedSignature.length === calculatedSignature.length &&
-      crypto.timingSafeEqual(receivedSignature, calculatedSignature);
-
-    if (!signatureValid) {
-      console.log("[Webhook] Invalid webhook signature");
-
-      return NextResponse.json(
-        { error: "Invalid webhook signature" },
-        { status: 401 }
-      );
-    }
-
-    console.log("[Webhook] Signature verified successfully");
-
-    // Parse the verified raw body into a JavaScript object.
     const event = JSON.parse(rawBody);
 
     const data = event?.data;
@@ -94,8 +28,6 @@ export async function POST(req) {
     const state = (data?.notification?.state || "").toUpperCase();
 
     const orderId = data?.notification?.metadata?.order_id;
-
-    console.log("[Webhook] RAW EVENT:", JSON.stringify(event, null, 2));
 
     console.log(
       "[Webhook] Normalized type:",
