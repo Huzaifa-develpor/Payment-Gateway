@@ -1,23 +1,30 @@
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
+import { safepay } from "@/lib/safepay";
 import Payment from "@/models/paymentModel";
 
 export async function POST(req) {
   try {
     await connectToDB();
 
-    // Read the raw request body.
+    // Verify that the webhook was sent by SafePay.
+    const isValid = await safepay.verify.webhook(req);
+
+    if (!isValid) {
+      console.log("[Webhook] Invalid webhook signature");
+
+      return NextResponse.json(
+        { error: "Invalid webhook signature" },
+        { status: 401 }
+      );
+    }
+
+    console.log("[Webhook] Signature verified successfully");
+
+    // Read the raw request body after signature verification.
     const rawBody = await req.text();
 
-    // Log all headers received from SafePay.
-    console.log(
-      "[Webhook] Headers:",
-      Object.fromEntries(req.headers.entries())
-    );
-
-    // Log the raw webhook body.
-    console.log("[Webhook] Raw body:", rawBody);
-
+    // Parse the verified webhook body.
     const event = JSON.parse(rawBody);
 
     const data = event?.data;
@@ -28,6 +35,8 @@ export async function POST(req) {
     const state = (data?.notification?.state || "").toUpperCase();
 
     const orderId = data?.notification?.metadata?.order_id;
+
+    console.log("[Webhook] RAW EVENT:", JSON.stringify(event, null, 2));
 
     console.log(
       "[Webhook] Normalized type:",
