@@ -51,6 +51,49 @@ export async function POST(req) {
       receivedBuffer.length === expectedBuffer.length &&
       crypto.timingSafeEqual(receivedBuffer, expectedBuffer);
 
+    console.log("[Webhook] Signature length:", receivedSignature.length);
+
+console.log(
+  "[Webhook] Secret exists:",
+  !!webhookSecret
+);
+
+console.log(
+  "[Webhook] Secret length:",
+  webhookSecret.length
+);
+
+console.log(
+  "[Webhook] Secret starts with:",
+  webhookSecret.slice(0, 4)
+);
+
+console.log(
+  "[Webhook] Raw body length:",
+  rawBody.length
+);
+
+console.log(
+  "[Webhook] Expected signature:",
+  expectedSignature
+);
+
+console.log(
+  "[Webhook] Received signature:",
+  receivedSignature
+);
+
+if (!signatureValid) {
+  console.log("[Webhook] Invalid webhook signature");
+
+  return NextResponse.json(
+    { error: "Invalid webhook signature" },
+    { status: 401 }
+  );
+}
+
+console.log("[Webhook] Signature verified successfully");
+
     if (!signatureValid) {
       console.log("[Webhook] Invalid webhook signature");
 
@@ -149,37 +192,7 @@ export async function POST(req) {
       );
     }
 
-    console.log("[Webhook] Signature length:", receivedSignature.length);
-
-console.log(
-  "[Webhook] Secret exists:",
-  !!webhookSecret
-);
-
-console.log(
-  "[Webhook] Secret length:",
-  webhookSecret?.length
-);
-
-console.log(
-  "[Webhook] Secret starts with:",
-  webhookSecret?.slice(0, 4)
-);
-
-console.log(
-  "[Webhook] Raw body length:",
-  rawBody.length
-);
-
-console.log(
-  "[Webhook] Expected signature:",
-  expectedSignature
-);
-
-console.log(
-  "[Webhook] Received signature:",
-  receivedSignature
-);
+    
 
     return NextResponse.json({ received: true });
   } catch (error) {
