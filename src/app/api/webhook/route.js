@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
+import { safepay } from "@/lib/safepay";
 import Payment from "@/models/paymentModel";
 import crypto from "crypto";
 
@@ -7,10 +8,10 @@ export async function POST(req) {
   try {
     await connectToDB();
 
-    // Read the raw request body.
+    // Read the raw request body exactly as received.
     const rawBody = await req.text();
 
-    // Read the SafePay signature from the request header.
+    // Read the signature sent by SafePay.
     const receivedSignature = req.headers.get("x-sfpy-signature");
 
     if (!receivedSignature) {
@@ -34,13 +35,13 @@ export async function POST(req) {
       );
     }
 
-    // Generate the expected HMAC-SHA512 signature from the raw body.
+    // Generate the signature using SafePay's legacy webhook format.
     const expectedSignature = crypto
       .createHmac("sha512", webhookSecret)
       .update(rawBody)
       .digest("hex");
 
-    // Compare the received signature with the calculated signature.
+    // Compare the SafePay signature with the calculated signature.
     const receivedBuffer = Buffer.from(receivedSignature, "hex");
     const expectedBuffer = Buffer.from(expectedSignature, "hex");
 
